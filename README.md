@@ -18,10 +18,11 @@ The Himawari analysis chain is:
 6. EVI2 → FPAR → GPP (`06`)
 7. Counterfactual GPP experiments (`08`) → Shapley attribution of GPP variability (`09`), with annual regional driver means from (`07`)
 
-Two MODIS comparisons are run independently of that chain and of each other:
+Three MODIS comparisons are run alongside that chain:
 
 8. MODIS site-level EVI2 → phenology comparison with Himawari (`10`)
-9. MCD15A2H 8-day FPAR export (`00`) → reprojection and smoothing (`11`) → region-wide MODIS GPP (`12`)
+9. Region-wide MODIS EVI2 → FPAR → GPP, using `02` and `06` without modification
+10. MCD15A2H 8-day FPAR export (`00`) → reprojection and smoothing (`11`) → region-wide MODIS GPP (`12`)
 
 ## Scripts
 
@@ -350,7 +351,15 @@ The script:
 4. applies the same crop-phenology detection procedure used for Himawari;
 5. outputs smoothed EVI2 and detected phenological dates.
 
-This script covers the site-level phenology comparison only. The region-wide MODIS comparison is handled by `11` and `12`.
+This script covers the site-level phenology comparison only. The two region-wide MODIS comparisons are described below.
+
+---
+
+### Region-wide MODIS EVI2-based GPP (no separate code)
+
+The region-wide MODIS EVI2-based estimate of FPAR and GPP requires no additional scripts. Daily MOD09GA/MYD09GA EVI2, exported from Google Earth Engine on the analysis grid, is passed through `02_Loess_EVI2.py` and `06_GPP_calculation.py` unchanged, with the same LOWESS span, the same pixel-wise minimum–maximum FPAR scaling, the same light-use-efficiency parameters, and the same daily meteorological forcing as the Himawari estimate.
+
+This is deliberate rather than incidental. Because the only difference between the two estimates is the source of the surface observations, the comparison isolates the effect of clear-sky sampling. Running the MODIS reflectances through a separate implementation would forfeit that control.
 
 ---
 
@@ -456,7 +465,9 @@ The repository contains the custom analytical code associated with the main conc
 
 Routine file-format conversion, data-download operations, and figure-formatting scripts are not included unless they directly affect the reported analytical results.
 
-Google Earth Engine was used for all MODIS data preparation. The MCD15A2H export is scripted here as `00_MCD15_GEE.js`; the site-level MOD09GA/MYD09GA EVI2 export was performed interactively in the Earth Engine code editor and its output CSV files are provided as input to `10_MODIS_site_analysis.py`.
+Google Earth Engine was used for all MODIS data preparation. The MCD15A2H export is scripted here as `00_MCD15_GEE.js`. The MOD09GA/MYD09GA EVI2 exports, both site-level and region-wide, were performed in the Earth Engine code editor; the site-level output CSV files are provided as input to `10_MODIS_site_analysis.py`, and the region-wide daily EVI2 is read directly by `02_Loess_EVI2.py`.
+
+No MODIS-specific implementation of the smoothing or light-use-efficiency steps exists, and none is intended: the region-wide MODIS EVI2 estimate reuses `02` and `06` so that it differs from the Himawari estimate in its input observations only.
 
 ## Execution order
 
@@ -484,11 +495,21 @@ Scripts are numbered in the order in which they are run. Within the Himawari cha
 09_Shapley_bootstrap.py
 ```
 
-The two MODIS comparisons run independently of the Himawari chain:
+The MODIS comparisons run independently of the Himawari chain:
 
 ```text
-10_MODIS_site_analysis.py   (independent)
+10_MODIS_site_analysis.py   (site-level phenology)
+```
 
+```text
+MOD09GA/MYD09GA daily EVI2 (Earth Engine export)
+        ↓
+02_Loess_EVI2.py            (reused unchanged)
+        ↓
+06_GPP_calculation.py       (reused unchanged)
+```
+
+```text
 00_MCD15_GEE.js
         ↓
 11_MCD15_FPAR_preprocess.py
